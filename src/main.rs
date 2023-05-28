@@ -1,6 +1,7 @@
 use core::fmt;
 use std::fmt::Error;
 
+
 const MAX_LEN: u32 = 510;
 
 const CR_LF: &str = "\r\n";
@@ -63,21 +64,43 @@ pub enum Recipient {
     User,
 }
 
+#[derive(Clone, Debug)]
+pub enum IrcClient {
+    MIrc,
+    FooIrc
+}
+
 #[derive(Clone)]
-struct Server<T: Clone + 'static> {
-    channels: Vec<Channel<T>>,
-    connected_users: Vec<User<T>>,
-    pub registered_clients: Vec<RegistrationMessage>,
+struct Server {
+    channels: Vec<Channel>,
+    connected_users: Vec<User>,
+    pub registered_clients: Vec<RegisteredClient>,
     server_name: String,
 }
+
+impl Server {
+ fn new(channels: Vec<Channel>, 
+    connected_users: Vec<User>, 
+    registered_clients: Vec<RegisteredClient>,
+    server_name: String) {
+    let proto_user = User {
+        nickname: "ProtoUser".to_string(),
+        client: IrcClient::FooIrc ,
+        full_name: "Proto User".to_string()
+    };
+    //     Server {
+
+    //     }
+    }
+}
 #[derive(Clone)]
-struct RegistrationMessage {
+struct RegisteredClient {
     user_nick: String,
     user_info: String,
 }
 #[derive(Clone)]
-struct Network<T: Clone + 'static> {
-    servers: Vec<Server<T>>,
+struct Network {
+    servers: Vec<Server>,
 }
 
 // pub trait Reply {
@@ -102,19 +125,19 @@ enum PrivilegeLevel {
 enum PrivilegedAction {}
 
 #[derive(Clone)]
-struct Channel<T: Clone> {
+struct Channel {
     name: String,
-    users: Vec<User<T>>,
-    creator: User<T>,
+    users: Vec<User>,
+    creator: User,
 }
 
 #[derive(Clone)]
-struct Client<T: Clone + 'static> {
-    server: Server<T>,
-    user: User<T>,
+struct Client {
+    server: Server,
+    user: User,
 }
 
-impl<T: Clone> Client<T> {
+impl Client {
     // let server = &self.Server;
 }
 
@@ -128,27 +151,27 @@ struct ServerReply {
 struct Service;
 
 #[derive(Clone)]
-pub struct User<T>
-where
-    T: Clone,
+pub struct User
 {
     nickname: String,
-    client: T,
+    client: IrcClient,
     full_name: String,
 }
 
-impl<T: Clone + std::fmt::Display> User<T> {
+impl std::fmt::Display for User {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}, {}, {}", self.nickname, self.client, self.full_name)
+        write!(f, "{}, {:?}, {}", self.nickname, self.client, self.full_name)
     }
 }
 
-impl<T: Clone> Server<T> {
-    pub fn register_client(mut self, client: Client<T>, server: Server<T>) -> ServerReply {
+
+
+impl Server {
+    pub fn register_client(mut self, client: Client, server: Server) -> ServerReply {
         let nick = &client.user.nickname;
         let user_info = &client.user.full_name;
         let username = client.user.full_name.clone();
-        let reg_msg = RegistrationMessage {
+        let reg_msg = RegisteredClient {
             user_nick: nick.to_string(),
             user_info: user_info.to_string(),
         };
@@ -180,7 +203,7 @@ impl<T: Clone> Server<T> {
     }
 }
 
-impl<T: Clone> User<T> {
+impl User {
     pub fn send_message(&self, msg: Message, recipient: Recipient) -> Message {
         let msg_len = msg.content.len();
         let max_msg_len = MAX_LEN as usize + CR_LF.len();
@@ -207,6 +230,24 @@ impl<T: Clone> User<T> {
     }
 }
 
+struct Greeting {
+    name: String,
+}
+
+impl Greeting {
+    fn new<T: AsRef<str>>(name: T) -> Self {
+        // AsRef is used for computationally non-expensive *reference to reference* conversion
+        Greeting {
+            name: name.as_ref().to_string()
+        }
+    }
+}
+
+impl fmt::Display for Greeting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Hello, {}", self.name)
+    }
+}
 // pub trait Service
 
 fn main() {
