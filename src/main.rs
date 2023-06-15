@@ -1,5 +1,7 @@
 use core::fmt;
 use std::fmt::Error;
+use std::net::TcpListener;
+use std::rc::Rc;
 
 
 const MAX_LEN: u32 = 510;
@@ -78,25 +80,108 @@ struct Server {
     server_name: String,
 }
 
+
 impl Server {
  fn new(channels: Vec<Channel>, 
     connected_users: Vec<User>, 
     registered_clients: Vec<RegisteredClient>,
-    server_name: String) {
+    server_name: String) -> Self {
     let proto_user = User {
         nickname: "ProtoUser".to_string(),
         client: IrcClient::FooIrc ,
         full_name: "Proto User".to_string()
     };
-    //     Server {
+    let user_vec = vec![proto_user.clone()];
+    let channel_owner = ChannelCreator(proto_user.nickname.clone());
+    let proto_channel = Channel {
+        name: "ProtoChannel".to_string(),
+        users: user_vec.clone(),
+        creator: channel_owner
+        
+    };
+    
+    let reg_client = RegisteredClient {
+        user_nick: proto_user.nickname,
+    };
+    let reg_vec = vec![reg_client];
+    let channel_vec = vec![proto_channel.clone()];
+    let proto_server =  Server {
+            channels: channel_vec,
+            connected_users: user_vec,
+            registered_clients: reg_vec,
+            server_name: "ProtoServer".to_string()
+        };
 
-    //     }
+        proto_server
+    }
+    pub fn register_client(mut self, client: Client, server: Server) -> ServerReply {
+        let nick = &client.user.nickname;
+        let user_info = &client.user.full_name;
+        let username = client.user.full_name.clone();
+        let reg_msg = RegisteredClient {
+            user_nick: nick.to_string(),
+        };
+
+        let srp = ServerReply {
+            prefix: server.server_name,
+            num_code: 001,
+            param_one: nick.to_string(),
+            param_two: "Welcome to the Internet Relay Network <".to_string()
+                + &client.user.nickname.to_string()
+                + ">!<"
+                + &username,
+        };
+        for ele in &self.registered_clients {
+            // Refactor to use contains method.
+            if ele.user_nick == reg_msg.user_nick {
+                return ServerReply {
+                    prefix: ":".to_string(),
+                    num_code: 433,
+                    param_one: ele.user_nick.clone(),
+                    param_two: ERR_NICKNAMEINUSE.to_string(),
+                };
+            } else {
+                return srp;
+            }
+        }
+        self.registered_clients.push(reg_msg.clone());
+
+        srp
+    }
+
+}
+#[derive(Clone, Debug)]
+pub struct User
+{
+    nickname: String,
+    client: IrcClient,
+    full_name: String,
+}
+
+impl User {
+    pub fn send_message(&self, msg: Message) -> Message {
+        let msg_len = msg.content.len();
+        let max_msg_len = MAX_LEN as usize + CR_LF.len();
+        
+        if msg_len > max_msg_len {
+            panic!("Message over character limit")
+        }
+        
+        let user_msg = Message {
+            recipient: "Sender".to_string(),
+            sender: "Sender".to_string(),
+            command: "".to_string(),
+            command_params: "".to_string(),
+            content: msg.content.clone(),
+        };
+        
+        
+        user_msg
     }
 }
 #[derive(Clone)]
 struct RegisteredClient {
     user_nick: String,
-    user_info: String,
 }
 #[derive(Clone)]
 struct Network {
@@ -109,7 +194,6 @@ struct Network {
 
 #[derive(Clone)]
 pub struct Message {
-
     sender: String,
     recipient: String,
     command: String,
@@ -124,11 +208,13 @@ enum PrivilegeLevel {
 
 enum PrivilegedAction {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
+struct ChannelCreator(String);
+#[derive(Clone, Debug)]
 struct Channel {
     name: String,
     users: Vec<User>,
-    creator: User,
+    creator: ChannelCreator,
 }
 
 #[derive(Clone)]
@@ -150,106 +236,16 @@ struct ServerReply {
 }
 struct Service;
 
-#[derive(Clone)]
-pub struct User
-{
-    nickname: String,
-    client: IrcClient,
-    full_name: String,
-}
-
 impl std::fmt::Display for User {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}, {:?}, {}", self.nickname, self.client, self.full_name)
     }
 }
 
-
-
-impl Server {
-    pub fn register_client(mut self, client: Client, server: Server) -> ServerReply {
-        let nick = &client.user.nickname;
-        let user_info = &client.user.full_name;
-        let username = client.user.full_name.clone();
-        let reg_msg = RegisteredClient {
-            user_nick: nick.to_string(),
-            user_info: user_info.to_string(),
-        };
-
-        let srp = ServerReply {
-            prefix: server.server_name,
-            num_code: 001,
-            param_one: nick.to_string(),
-            param_two: "Welcome to the Internet Relay Network <".to_string()
-                + &client.user.nickname.to_string()
-                + ">!<"
-                + &username,
-        };
-        for ele in &self.registered_clients {
-            if ele.user_nick == reg_msg.user_nick {
-                return ServerReply {
-                    prefix: ":".to_string(),
-                    num_code: 433,
-                    param_one: ele.user_nick.clone(),
-                    param_two: ERR_NICKNAMEINUSE.to_string(),
-                };
-            } else {
-                return srp;
-            }
-        }
-        self.registered_clients.push(reg_msg.clone());
-
-        srp
-    }
-}
-
-impl User {
-    pub fn send_message(&self, msg: Message, recipient: Recipient) -> Message {
-        let msg_len = msg.content.len();
-        let max_msg_len = MAX_LEN as usize + CR_LF.len();
-
-        if msg_len > max_msg_len {
-            panic!("Message over character limit")
-        }
-
-        let user_msg = Message {
-            recipient: "Sender".to_string(),
-            sender: "Sender".to_string(),
-            command: "".to_string(),
-            command_params: "".to_string(),
-            content: msg.content.clone(),
-        };
-
-        match recipient {
-            Recipient::Server => {}
-
-            Recipient::User => {}
-        }
-
-        user_msg
-    }
-}
-
-struct Greeting {
-    name: String,
-}
-
-impl Greeting {
-    fn new<T: AsRef<str>>(name: T) -> Self {
-        // AsRef is used for computationally non-expensive *reference to reference* conversion
-        Greeting {
-            name: name.as_ref().to_string()
-        }
-    }
-}
-
-impl fmt::Display for Greeting {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Hello, {}", self.name)
-    }
-}
 // pub trait Service
 
 fn main() {
+
+
     println!("Hello, world!");
 }
