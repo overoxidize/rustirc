@@ -1,8 +1,11 @@
 use core::fmt;
 use std::fmt::Error;
 use std::net::{TcpListener, TcpStream, SocketAddr, IpAddr, Ipv4Addr};
+use std::{io, time};
 use std::io::{prelude::*, BufReader};
 use std::rc::Rc;
+use std::thread;
+use uuid::Uuid;
 
 
 const MAX_LEN: u32 = 510;
@@ -79,49 +82,67 @@ pub enum IrcClient {
     FooIrc
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Server {
     channels: Vec<Channel>,
     pub connected_users: Vec<User>,
     server_name: String,
-    socket_addr: SocketAddr
+    socket_addr: SocketAddr,
+    nud: Uuid,
+
 }
+
 
 impl Server {
  fn new(channels: Vec<Channel>, 
     connected_users: Vec<User>, 
     registered_clients: Vec<RegisteredClient>,
-    server_name: String) -> Self {
-    let proto_user = User {
-        nickname: "ProtoUser".to_string(),
-        client: IrcClient::FooIrc ,
-        full_name: "Proto User".to_string()
-    };
-    let user_vec = vec![proto_user.clone()];
-    let channel_owner = ChannelCreator(proto_user.nickname.clone());
-    let proto_channel = Channel {
-        name: "ProtoChannel".to_string(),
-        users: user_vec.clone(),
-        creator: channel_owner
-        
-    };
-    
-    let reg_client = RegisteredClient {
-        user_nick: proto_user.nickname,
-    };
-    let reg_vec = vec![reg_client];
-    let channel_vec = vec![proto_channel.clone()];
-    let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),8080);
-    let proto_server =  Server {
-            channels: channel_vec,
-            connected_users: user_vec,
-            server_name: "ProtoServer".to_string(),
-            socket_addr: socket
-        };
+    server_name: String,
+    socket_addr: SocketAddr,
+    nud: Uuid) -> Self {
 
-        proto_server
+        if server_name.len() > 63 {
+            
+        }
+    // let proto_user = User {
+    //     nickname: "ProtoUser".to_string(),
+    //     client: IrcClient::FooIrc ,
+    //     full_name: "Proto User".to_string()
+    // };
+    // let user_vec = vec![proto_user.clone()];
+    // let channel_owner = ChannelCreator(proto_user.nickname.clone());
+    // let proto_channel = Channel {
+    //     name: "ProtoChannel".to_string(),
+    //     users: user_vec.clone(),
+    //     creator: channel_owner
+        
+    // };
+    
+    // let reg_client = RegisteredClient {
+    //     user_nick: proto_user.nickname,
+    // };
+    // let reg_vec = vec![reg_client];
+    // let channel_vec = vec![proto_channel.clone()];
+    // let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),8080);
+    // let proto_server =  Server {
+    //         channels: channel_vec,
+    //         connected_users: user_vec,
+    //         server_name: "ProtoServer".to_string(),
+    //         socket_addr: socket
+    //     };
+
+        Server {
+            channels,
+            connected_users,
+            server_name,
+            socket_addr,
+            nud
+        }
     }
     pub fn register_client(mut self, client: Client, server: Server) -> ServerReply {
+
+        let server_addr = server.socket_addr;
+
         let nick = &client.user.nickname;
         let user_info = &client.user.full_name;
         let username = client.user.full_name.clone();
@@ -216,11 +237,15 @@ struct Channel {
     creator: ChannelCreator,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Client {
     server: Server,
     user: User,
 }
+
+// impl Client {
+//     fn register_client()
+// }
 
 #[derive(Clone)]
 struct ServerReply {
@@ -237,7 +262,7 @@ impl std::fmt::Display for User {
 }
 
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream) -> io::Result<()>{
     let buf_reader = BufReader::new(&mut stream);
 
     let http_request: Vec<_> = buf_reader
@@ -246,16 +271,52 @@ fn handle_connection(mut stream: TcpStream) {
         .take_while(|line| !line.is_empty())
         .collect();
 
-    println!("Request: {:#?}", http_request);
+        let response = "HTTP/1.1 200 OK\r\n\r\n";
+
+        stream.write_all(response.as_bytes()).unwrap();
+
+        Ok(())
+}
+
+fn handle_sender(mut stream: TcpStream) -> io::Result<()> {
+    let mut buf = [0;512];
+
+    for _ in 0..1000 {
+        let bytes_read = stream.read(&mut buf)?;
+
+        if bytes_read == 0 {
+            return Ok(())
+        }
+
+        stream.write(&buf[..bytes_read])?;
+
+        println!("from the sender: {}", String::from_utf8_lossy(&buf));
+
+        thread::sleep(time::Duration::from_secs(1));
+    }
+
+    Ok(())
 }
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+
+    let mut thread_vec: Vec<thread::JoinHandle<()>> = Vec::new();
 
     for stream in listener.incoming() {
-        let stream = stream.unwrap();
+        let stream = stream.expect("failed");
+
+        let handle = thread::spawn(move || {
+            handle_sender(stream).unwrap_or_else(|error| eprintln!("{:?}", error))
+        });
+
+        thread_vec.push(handle);
+        
+    }
+    
+    for handle in thread_vec {
+        handle.join().unwrap();
     }
 
-    println!("Hello, world!");
 }
 
