@@ -1,6 +1,7 @@
 use core::fmt;
 use std::fmt::Error;
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream, SocketAddr, IpAddr, Ipv4Addr};
+use std::io::{prelude::*, BufReader};
 use std::rc::Rc;
 
 
@@ -66,6 +67,12 @@ pub enum Recipient {
     User,
 }
 
+pub enum Commands {
+    Join,
+    Part,
+    PrivMsg
+}
+
 #[derive(Clone, Debug)]
 pub enum IrcClient {
     MIrc,
@@ -75,11 +82,10 @@ pub enum IrcClient {
 #[derive(Clone)]
 struct Server {
     channels: Vec<Channel>,
-    connected_users: Vec<User>,
-    pub registered_clients: Vec<RegisteredClient>,
+    pub connected_users: Vec<User>,
     server_name: String,
+    socket_addr: SocketAddr
 }
-
 
 impl Server {
  fn new(channels: Vec<Channel>, 
@@ -105,11 +111,12 @@ impl Server {
     };
     let reg_vec = vec![reg_client];
     let channel_vec = vec![proto_channel.clone()];
+    let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),8080);
     let proto_server =  Server {
             channels: channel_vec,
             connected_users: user_vec,
-            registered_clients: reg_vec,
-            server_name: "ProtoServer".to_string()
+            server_name: "ProtoServer".to_string(),
+            socket_addr: socket
         };
 
         proto_server
@@ -131,28 +138,28 @@ impl Server {
                 + ">!<"
                 + &username,
         };
-        for ele in &self.registered_clients {
-            // Refactor to use contains method.
-            if ele.user_nick == reg_msg.user_nick {
+        for ele in &self.connected_users {
+            // Refactor to use contains method, if possible.
+            if ele.nickname == reg_msg.user_nick {
                 return ServerReply {
                     prefix: ":".to_string(),
                     num_code: 433,
-                    param_one: ele.user_nick.clone(),
+                    param_one: ele.nickname.clone(),
                     param_two: ERR_NICKNAMEINUSE.to_string(),
                 };
             } else {
                 return srp;
             }
         }
-        self.registered_clients.push(reg_msg.clone());
+        self.connected_users.push(client.user);
 
         srp
     }
 
 }
+
 #[derive(Clone, Debug)]
-pub struct User
-{
+pub struct User {
     nickname: String,
     client: IrcClient,
     full_name: String,
@@ -179,18 +186,17 @@ impl User {
         user_msg
     }
 }
+
 #[derive(Clone)]
 struct RegisteredClient {
     user_nick: String,
 }
 #[derive(Clone)]
 struct Network {
+    // Use petgraph to implement this.
     servers: Vec<Server>,
 }
 
-// pub trait Reply {
-//     fn reply(&self) -> Self;
-// }
 
 #[derive(Clone)]
 pub struct Message {
@@ -200,13 +206,6 @@ pub struct Message {
     command_params: String,
     content: String,
 }
-
-enum PrivilegeLevel {
-    One,
-    Two,
-}
-
-enum PrivilegedAction {}
 
 #[derive(Clone, Debug)]
 struct ChannelCreator(String);
@@ -223,10 +222,6 @@ struct Client {
     user: User,
 }
 
-impl Client {
-    // let server = &self.Server;
-}
-
 #[derive(Clone)]
 struct ServerReply {
     prefix: String,
@@ -234,7 +229,6 @@ struct ServerReply {
     param_one: String,
     param_two: String,
 }
-struct Service;
 
 impl std::fmt::Display for User {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -242,10 +236,26 @@ impl std::fmt::Display for User {
     }
 }
 
-// pub trait Service
+
+fn handle_connection(mut stream: TcpStream) {
+    let buf_reader = BufReader::new(&mut stream);
+
+    let http_request: Vec<_> = buf_reader
+        .lines()
+        .map(|result| result.unwrap())
+        .take_while(|line| !line.is_empty())
+        .collect();
+
+    println!("Request: {:#?}", http_request);
+}
 
 fn main() {
+    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
 
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
+    }
 
     println!("Hello, world!");
 }
+
