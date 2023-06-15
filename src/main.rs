@@ -6,6 +6,7 @@ use std::io::{prelude::*, BufReader};
 use std::rc::Rc;
 use std::thread;
 use uuid::Uuid;
+use anyhow::{anyhow, Result};
 
 
 const MAX_LEN: u32 = 510;
@@ -92,7 +93,6 @@ struct Server {
 
 }
 
-
 impl Server {
  fn new(channels: Vec<Channel>, 
     connected_users: Vec<User>, 
@@ -102,8 +102,47 @@ impl Server {
     nud: Uuid) -> Self {
 
         if server_name.len() > 63 {
-            
+            eprintln!("Server name cannot be greater than 63 characters in length.");
+        } 
+            Server {
+                channels,
+                connected_users,
+                server_name,
+                socket_addr,
+                nud
+            }
+
         }
+
+    fn handle_registration(mut self, client: Client, user: User) -> ServerReply {
+        let conn_user_vec: Vec<String> = self.connected_users.iter().map(|user| user.nickname.clone()).collect();
+        
+        let mut srp: ServerReply;
+        if conn_user_vec.contains(&user.nickname) {
+            srp = ServerReply {
+                prefix: ":".to_string(),
+                num_code: 433,
+                param_one: user.nickname.clone(),
+                param_two: ERR_NICKNAMEINUSE.to_string(),
+            };
+
+            
+            eprintln!("This username has already been taken");
+            return srp
+        } else {
+            srp = ServerReply {
+                prefix: self.server_name,
+                num_code: 001,
+                param_one: user.nickname.to_string(),
+                param_two: "Welcome to the Internet Relay Network <".to_string()
+                    + &client.user.nickname.to_string()
+                    + ">!<"
+                    + &user.full_name,
+            };
+
+            srp
+        }
+    }
     // let proto_user = User {
     //     nickname: "ProtoUser".to_string(),
     //     client: IrcClient::FooIrc ,
@@ -131,53 +170,9 @@ impl Server {
     //         socket_addr: socket
     //     };
 
-        Server {
-            channels,
-            connected_users,
-            server_name,
-            socket_addr,
-            nud
-        }
-    }
-    pub fn register_client(mut self, client: Client, server: Server) -> ServerReply {
-
-        let server_addr = server.socket_addr;
-
-        let nick = &client.user.nickname;
-        let user_info = &client.user.full_name;
-        let username = client.user.full_name.clone();
-        let reg_msg = RegisteredClient {
-            user_nick: nick.to_string(),
-        };
-
-        let srp = ServerReply {
-            prefix: server.server_name,
-            num_code: 001,
-            param_one: nick.to_string(),
-            param_two: "Welcome to the Internet Relay Network <".to_string()
-                + &client.user.nickname.to_string()
-                + ">!<"
-                + &username,
-        };
-        for ele in &self.connected_users {
-            // Refactor to use contains method, if possible.
-            if ele.nickname == reg_msg.user_nick {
-                return ServerReply {
-                    prefix: ":".to_string(),
-                    num_code: 433,
-                    param_one: ele.nickname.clone(),
-                    param_two: ERR_NICKNAMEINUSE.to_string(),
-                };
-            } else {
-                return srp;
-            }
-        }
-        self.connected_users.push(client.user);
-
-        srp
     }
 
-}
+
 
 #[derive(Clone, Debug)]
 pub struct User {
@@ -243,9 +238,35 @@ struct Client {
     user: User,
 }
 
-// impl Client {
-//     fn register_client()
-// }
+impl Client {
+    pub fn register_client(mut self, user: User, mut server: Server, pass: bool) {
+
+        let connection = TcpStream::connect(server.socket_addr).unwrap();
+
+        let mut reg_msg = String::new();
+
+        // let nick = &user.nickname;
+        // let user_info = &user.full_name;
+        // let username = user.full_name;
+        // let reg_msg = RegisteredClient {
+        //     user_nick: nick.to_string(),
+        // };
+
+ 
+
+        let srp = ServerReply {
+            prefix: ":".to_string(),
+            num_code: 433,
+            param_one: user.nickname.clone(),
+            param_two: ERR_NICKNAMEINUSE.to_string(),
+        };
+            
+        server.connected_users.push(user);
+
+        
+    }
+
+}
 
 #[derive(Clone)]
 struct ServerReply {
