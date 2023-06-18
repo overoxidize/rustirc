@@ -6,21 +6,22 @@ use crate::client::Client;
 use std::{io, time};
 use std::io::{Read, Write, BufReader, BufRead};
 use std::thread;
-
+use std::rc::Rc;
+use std::cell::RefCell;
 const ERR_NICKNAMEINUSE: &str = "433";
 
 #[derive(Clone, Debug)]
 pub struct Server {
     pub channels: Vec<Channel>,
     pub connected_users: Vec<User>,
-    pub server_name: String,
+    pub server_name: Rc<RefCell<String>>,
     pub socket_addr: SocketAddr,
     pub nud: Uuid,
 
 }
 
-#[derive(Clone)]
-struct ServerReply {
+#[derive(Clone, Debug)]
+pub struct ServerReply {
     prefix: String,
     num_code: u32,
     param_one: String,
@@ -31,30 +32,30 @@ struct ServerReply {
 impl Server {
  fn new(channels: Vec<Channel>, 
     connected_users: Vec<User>, 
-    server_name: String,
+    server_name: Rc<RefCell<String>>,
     socket_addr: SocketAddr,
     nud: Uuid) -> Self {
 
-        if server_name.len() > 63 {
+        if server_name.borrow().len() > 63 {
             eprintln!("Server name cannot be greater than 63 characters in length.");
         } 
             Server {
                 channels,
                 connected_users,
-                server_name,
+                server_name: Rc::new(RefCell::new(String::from(""))),
                 socket_addr,
                 nud
             }
 
         }
 
-    pub fn run(self) {
+    pub fn run(&self) {
         let listener = TcpListener::bind(self.socket_addr).unwrap();
 
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
-                    self.clone().handle_connection(stream);
+                    self.clone().handle_connection(stream).unwrap();
                 }
                 Err(e) => {
                     eprintln!("There was a server error {:?}", e);
@@ -63,39 +64,42 @@ impl Server {
         }
     }
 
-    fn handle_registration(mut self, client: Client, user: User) -> ServerReply {
+    pub fn handle_registration(&mut self, client: Client, user: User) -> ServerReply {
        
-        let conn_user_vec: Vec<String> = self.connected_users.iter().map(|user| user.nickname.clone()).collect();
+        let conn_user_vec: Vec<_> = self.connected_users.iter().map(move |user| user.nickname.clone()).collect();
 
         let srp: ServerReply;
 
         if conn_user_vec.contains(&user.nickname) {
-            srp = ServerReply {
+            let srp = ServerReply {
                 prefix: ":".to_string(),
                 num_code: 433,
-                param_one: user.nickname.clone(),
+                param_one: user.nickname.borrow().to_string(),
                 param_two: ERR_NICKNAMEINUSE.to_string(),
             };
 
             eprintln!("This username has already been taken");
+            
+            let mut connection = TcpStream::connect(self.socket_addr).unwrap();
 
-            return srp
+            srp
         } else {
             srp = ServerReply {
-                prefix: self.server_name,
+                prefix: self.server_name.borrow().to_string(),
                 num_code: 001,
-                param_one: user.nickname.to_string(),
+                param_one: user.nickname.borrow().to_string(),
                 param_two: "Welcome to the Internet Relay Network <".to_string()
-                    + &client.user.nickname.to_string()
+                    + &client.user.nickname.borrow()
                     + ">!<"
                     + &user.full_name,
             };
 
+            self.connected_users.push(user);
             srp
         }
     }
 
-    pub fn handle_sender(self, mut stream: TcpStream) -> io::Result<()> {
+    pub fn handle_sender(self, mut stream: &TcpStream) -> io::Result<()> {
         let mut buf = [0;512];
     
         for _ in 0..1000 {

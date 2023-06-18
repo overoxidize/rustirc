@@ -1,10 +1,12 @@
+use std::{rc::Rc, cell::{RefCell, Ref}};
+
 const MAX_LEN: u32 = 510;
 
 const CR_LF: &str = "\r\n";
 
 #[derive(Clone, Debug)]
 pub struct User {
-    pub nickname: String,
+    pub nickname: Rc<RefCell<String>>,
     pub client: IrcClient,
     pub full_name: String,
 }
@@ -29,7 +31,7 @@ pub enum IrcClient {
 impl User {
     pub fn new(nickname: String, client: IrcClient, full_name: String) -> Self {
         User {
-            nickname,
+            nickname: Rc::new(RefCell::new(String::from(""))),
             client: IrcClient::FooIrc,
             full_name,
         }

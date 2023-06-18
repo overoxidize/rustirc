@@ -18,18 +18,18 @@ impl Client {
         }
     }
 
-    pub fn register_client(mut self, user: User, mut server: Server, pass: bool) {
+    pub fn register_client(&self, user: &User, server: &mut Server, pass: bool) {
 
         let mut connection = TcpStream::connect(server.socket_addr).unwrap();
 
-        let nick_msg = String::from("Nick") + &user.nickname.to_string();
-        let user_msg = String::from("Nick") + &user.nickname.to_string();
+        let nick_msg = String::from("NICK") + &user.nickname.borrow();
+        let user_msg = String::from("USER") + &user.nickname.borrow();
         let mut buffer = Vec::new();
 
         connection.write(nick_msg.as_bytes());
         connection.write(user_msg.as_bytes());
 
-        connection.read_to_end(&mut buffer);
+        // connection.read_to_end(&mut buffer);
 
         let server_resp = String::from_utf8(buffer).unwrap();
 
@@ -43,7 +43,7 @@ impl Client {
         
         println!("Server response: {:}", server_resp);
             
-        server.connected_users.push(user);
+        // server.connected_users.push(user);
 
         
     }
