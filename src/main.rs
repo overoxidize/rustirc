@@ -92,14 +92,14 @@ struct Network {
 fn main() {
 
     let proto_user = User {
-        nickname: Rc::new(RefCell::new("ProtoUser".to_string())),
+        nickname: "ProtoUser".to_string(),
         client: IrcClient::FooIrc ,
         full_name: "Proto User".to_string()
     };
 
     let user_vec = vec![proto_user.clone()];
 
-    let channel_owner = ChannelCreator(proto_user.nickname.borrow().to_string());
+    let channel_owner = ChannelCreator(proto_user.nickname.to_string());
 
     let proto_channel = Channel {
         name: "ProtoChannel".to_string(),
@@ -112,10 +112,11 @@ fn main() {
 
     let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),7878);
     let server_nud = Uuid::new_v4();
+    
     let mut proto_server = Server {
         channels: channel_vec,
         connected_users: user_vec,
-        server_name: Rc::new(RefCell::new(String::from("ProtoServer"))),
+        server_name: String::from("ProtoServer"),
         socket_addr: socket,
         nud: server_nud
     };
@@ -128,9 +129,10 @@ fn main() {
     
     // Either within the function `run` itself, or prior to calling it,
     // we need to set up writing to stdout.
-    proto_server.run();
-
-    proto_client.register_client(&proto_user, &mut proto_server, false);
+    println!("Before server.run.");
+    proto_server.clone().run();
+    println!("After server.run");
+    proto_client.register_client(&proto_user, socket, false);
 
     let conn_user = proto_server.handle_registration(proto_client, proto_user);
 

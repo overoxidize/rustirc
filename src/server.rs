@@ -8,13 +8,15 @@ use std::io::{Read, Write, BufReader, BufRead};
 use std::thread;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::sync::Arc;
+
 const ERR_NICKNAMEINUSE: &str = "433";
 
 #[derive(Clone, Debug)]
 pub struct Server {
     pub channels: Vec<Channel>,
     pub connected_users: Vec<User>,
-    pub server_name: Rc<RefCell<String>>,
+    pub server_name: String,
     pub socket_addr: SocketAddr,
     pub nud: Uuid,
 
@@ -32,36 +34,47 @@ pub struct ServerReply {
 impl Server {
  fn new(channels: Vec<Channel>, 
     connected_users: Vec<User>, 
-    server_name: Rc<RefCell<String>>,
+    server_name: String,
     socket_addr: SocketAddr,
     nud: Uuid) -> Self {
 
-        if server_name.borrow().len() > 63 {
+        if server_name.len() > 63 {
             eprintln!("Server name cannot be greater than 63 characters in length.");
         } 
             Server {
                 channels,
                 connected_users,
-                server_name: Rc::new(RefCell::new(String::from(""))),
+                server_name: String::from(""),
                 socket_addr,
                 nud
             }
 
         }
 
-    pub fn run(&self) {
+    pub fn run(self) {
         let listener = TcpListener::bind(self.socket_addr).unwrap();
 
-        for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    self.clone().handle_connection(stream).unwrap();
+        println!("Top of run: {}", 3);
+
+        thread::spawn(move || {
+
+            for stream in listener.incoming() {
+                // check out incoming() docs
+                match stream {
+                    Ok(stream) => {
+                        println!("stream: {:?}", stream);
+                        self.clone().handle_connection(stream).unwrap();
+                    }
+                    Err(e) => {
+                        eprintln!("There was a server error {:?}", e);
+                    }
                 }
-                Err(e) => {
-                    eprintln!("There was a server error {:?}", e);
-                }
+    
+                println!("Count inside loop {}", 1);
             }
-        }
+        });
+
+        println!("Count inside loop {}", 1);
     }
 
     pub fn handle_registration(&mut self, client: Client, user: User) -> ServerReply {
@@ -70,31 +83,32 @@ impl Server {
 
         let srp: ServerReply;
 
+        let mut connection = TcpStream::connect(self.socket_addr).unwrap();
         if conn_user_vec.contains(&user.nickname) {
             let srp = ServerReply {
                 prefix: ":".to_string(),
                 num_code: 433,
-                param_one: user.nickname.borrow().to_string(),
+                param_one: user.nickname.to_string(),
                 param_two: ERR_NICKNAMEINUSE.to_string(),
             };
 
             eprintln!("This username has already been taken");
             
-            let mut connection = TcpStream::connect(self.socket_addr).unwrap();
 
             srp
         } else {
             srp = ServerReply {
-                prefix: self.server_name.borrow().to_string(),
+                prefix: ":".to_string() + &self.server_name.to_string(),
                 num_code: 001,
-                param_one: user.nickname.borrow().to_string(),
+                param_one: user.nickname.to_string(),
                 param_two: "Welcome to the Internet Relay Network <".to_string()
-                    + &client.user.nickname.borrow()
+                    + &client.user.nickname
                     + ">!<"
                     + &user.full_name,
             };
 
             self.connected_users.push(user);
+            connection.write(srp.param_two.as_bytes()).unwrap();
             srp
         }
     }
@@ -120,6 +134,9 @@ impl Server {
     }
 
     fn handle_connection(self, mut stream: TcpStream) -> io::Result<()>{
+        
+        println!("Handle connection output: {}", 2);
+        
         let buf_reader = BufReader::new(&mut stream);
     
         let http_request: Vec<_> = buf_reader

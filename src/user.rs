@@ -6,7 +6,7 @@ const CR_LF: &str = "\r\n";
 
 #[derive(Clone, Debug)]
 pub struct User {
-    pub nickname: Rc<RefCell<String>>,
+    pub nickname: String,
     pub client: IrcClient,
     pub full_name: String,
 }
@@ -31,7 +31,7 @@ pub enum IrcClient {
 impl User {
     pub fn new(nickname: String, client: IrcClient, full_name: String) -> Self {
         User {
-            nickname: Rc::new(RefCell::new(String::from(""))),
+            nickname: String::from(""),
             client: IrcClient::FooIrc,
             full_name,
         }
