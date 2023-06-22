@@ -6,9 +6,6 @@ use crate::client::Client;
 use std::{io, time};
 use std::io::{Read, Write, BufReader, BufRead};
 use std::thread;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::sync::Arc;
 
 const ERR_NICKNAMEINUSE: &str = "433";
 
@@ -63,17 +60,16 @@ impl Server {
                 match stream {
                     Ok(stream) => {
                         println!("stream: {:?}", stream);
-                        self.clone().handle_connection(stream).unwrap();
+
+                        let reg_msg = &self.handle_sender(&stream).unwrap();
                     }
                     Err(e) => {
                         eprintln!("There was a server error {:?}", e);
                     }
                 }
     
-                println!("Count inside loop {}", 1);
             }
         });
-
         println!("Count inside loop {}", 1);
     }
 
@@ -84,6 +80,14 @@ impl Server {
         let srp: ServerReply;
 
         let mut connection = TcpStream::connect(self.socket_addr).unwrap();
+
+        let mut buffer = Vec::new();
+
+        let client_msg = connection.read_to_end(&mut buffer).unwrap();
+
+        let client_parse = String::from_utf8(buffer).unwrap();
+
+        println!("Client parse: {:?}", client_parse);
         if conn_user_vec.contains(&user.nickname) {
             let srp = ServerReply {
                 prefix: ":".to_string(),
@@ -107,13 +111,13 @@ impl Server {
                     + &user.full_name,
             };
 
-            self.connected_users.push(user);
             connection.write(srp.param_two.as_bytes()).unwrap();
+            self.connected_users.push(user);
             srp
         }
     }
 
-    pub fn handle_sender(self, mut stream: &TcpStream) -> io::Result<()> {
+    pub fn handle_sender(&self, mut stream: &TcpStream) -> io::Result<()> {
         let mut buf = [0;512];
     
         for _ in 0..1000 {
@@ -123,11 +127,12 @@ impl Server {
                 return Ok(())
             }
     
-            stream.write(&buf[..bytes_read])?;
+            let client_reg_msg = stream.write(&buf[..bytes_read])?;
     
-            println!("from the sender: {}", String::from_utf8_lossy(&buf));
+            let client_msg = String::from_utf8(buf.to_vec()).unwrap();
+            // println!("from the sender: {}", client_msg.unwrap());
     
-            thread::sleep(time::Duration::from_secs(1));
+            // thread::sleep(time::Duration::from_secs(1));
         }
     
         Ok(())
@@ -151,28 +156,5 @@ impl Server {
     
             Ok(())
     }
-    // let proto_user = User {
-    //     nickname: "ProtoUser".to_string(),
-    //     client: IrcClient::FooIrc ,
-    //     full_name: "Proto User".to_string()
-    // };
-    // let user_vec = vec![proto_user.clone()];
-    // let channel_owner = ChannelCreator(proto_user.nickname.clone());
-    // let proto_channel = Channel {
-    //     name: "ProtoChannel".to_string(),
-    //     users: user_vec.clone(),
-    //     creator: channel_owner
-        
-    // };
-    
-
-    // let channel_vec = vec![proto_channel.clone()];
-    
-    // let proto_server =  Server {
-    //         channels: channel_vec,
-    //         connected_users: user_vec,
-    //         server_name: "ProtoServer".to_string(),
-    //         socket_addr: socket
-    //     };
 
     }

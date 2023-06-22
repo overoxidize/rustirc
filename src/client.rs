@@ -22,15 +22,14 @@ impl Client {
 
         let mut connection = TcpStream::connect(socket).unwrap();
 
-        let nick_msg = String::from("NICK") + &user.nickname;
-        let user_msg = String::from("USER") + &user.full_name;
+        let nick_msg = String::from("NICK ") + &user.nickname + " ";
+        let user_msg = String::from("USER ") + &user.nickname + " * * " + &user.full_name;
 
 
-        connection.write(nick_msg.as_bytes()).expect("Failed to write.");
+        connection.write_all(nick_msg.as_bytes()).expect("Failed to write.");
 
         
-        connection.write(nick_msg.as_bytes());
-        connection.write(user_msg.as_bytes());
+        // connection.write_all(user_msg.as_bytes()).expect("Failed to write.");
         
         let mut buffer = Vec::new();
 

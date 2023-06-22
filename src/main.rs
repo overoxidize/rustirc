@@ -112,8 +112,8 @@ fn main() {
 
     let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),7878);
     let server_nud = Uuid::new_v4();
-    
-    let mut proto_server = Server {
+
+    let mut proto_server: Server = Server {
         channels: channel_vec,
         connected_users: user_vec,
         server_name: String::from("ProtoServer"),
@@ -127,11 +127,7 @@ fn main() {
     };
 
     
-    // Either within the function `run` itself, or prior to calling it,
-    // we need to set up writing to stdout.
-    println!("Before server.run.");
     proto_server.clone().run();
-    println!("After server.run");
     proto_client.register_client(&proto_user, socket, false);
 
     let conn_user = proto_server.handle_registration(proto_client, proto_user);
