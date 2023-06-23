@@ -1,17 +1,17 @@
 use std::net::{TcpStream, SocketAddr};
-use crate::server::Server;
+use crate::server::LeafServer;
 use crate::user::User;
 use std::io::{Read, Write};
 
 #[derive(Clone, Debug)]
 pub struct Client {
-    pub server: Server,
+    pub server: LeafServer,
     pub user: User,
 }
 
 impl Client {
 
-    pub fn new(server: Server, user: User) -> Self {
+    pub fn new(server: LeafServer, user: User) -> Self {
         Client {
             server,
             user

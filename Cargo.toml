@@ -4,12 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-# [[bin]]
-# name = "rustirc"
-# path = "/src/rustirc/bin/main.rs"
-# [[bin]]
-# name = "micro-client"
-# path = "/src/micro-client/bin/main.rs"
 
 [dependencies]
 anyhow = "1.0.71"

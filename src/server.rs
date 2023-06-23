@@ -1,4 +1,6 @@
 use uuid::Uuid;
+use std::fmt::Formatter;
+use std::{fmt, collections::HashMap};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use crate::channel::Channel;
 use crate::user::User;
@@ -10,10 +12,70 @@ use std::thread;
 const ERR_NICKNAMEINUSE: &str = "433";
 
 #[derive(Clone, Debug)]
-pub struct Server {
+pub struct ServerName(pub String);
+
+impl fmt::Display for ServerName {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct HubServer {
+    pub leaf_servers: Option<HashMap<ServerName, LeafServer>>,
+    pub socket_addr: SocketAddr,
+    pub nud: Uuid,
+}
+
+impl HubServer {
+    pub fn run(self) -> HubServer {
+        let listener: TcpListener = TcpListener::bind(self.socket_addr).unwrap();
+
+        thread::spawn(move || {
+            for stream in listener.incoming() {
+              match stream  {    
+                    Ok(stream) => {
+                        let stream = &self.clone().handle_sender(&stream);
+                        stream.as_ref().unwrap();
+                    }
+                    Err(e) => {
+                        eprintln!("There was a server error {:?}", e);
+                    }
+                }
+            }
+        });
+
+        self.clone()
+
+    }
+
+        pub fn handle_sender(&self, mut stream: &TcpStream) -> io::Result<()> {
+        let mut buf = [0;512];
+    
+        for _ in 0..1000 {
+            let bytes_read = stream.read(&mut buf)?;
+    
+            if bytes_read == 0 {
+                return Ok(())
+            }
+    
+            let client_reg_msg = stream.write(&buf[..bytes_read])?;
+    
+            let client_msg = String::from_utf8(buf.to_vec()).unwrap();
+            println!("from the sender: {}", client_msg);
+    
+            thread::sleep(time::Duration::from_secs(1));
+        }
+    
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LeafServer {
     pub channels: Vec<Channel>,
     pub connected_users: Vec<User>,
-    pub server_name: String,
+    pub server_name: ServerName,
     pub socket_addr: SocketAddr,
     pub nud: Uuid,
 
@@ -28,7 +90,7 @@ pub struct ServerReply {
 }
 
 
-impl Server {
+impl LeafServer {
  fn new(channels: Vec<Channel>, 
     connected_users: Vec<User>, 
     server_name: String,
@@ -38,10 +100,10 @@ impl Server {
         if server_name.len() > 63 {
             eprintln!("Server name cannot be greater than 63 characters in length.");
         } 
-            Server {
+            LeafServer {
                 channels,
                 connected_users,
-                server_name: String::from(""),
+                server_name: ServerName(String::from("")),
                 socket_addr,
                 nud
             }
@@ -60,8 +122,7 @@ impl Server {
                 match stream {
                     Ok(stream) => {
                         println!("stream: {:?}", stream);
-
-                        let reg_msg = &self.handle_sender(&stream).unwrap();
+                        &self.handle_sender(&stream).unwrap();
                     }
                     Err(e) => {
                         eprintln!("There was a server error {:?}", e);
@@ -99,7 +160,7 @@ impl Server {
             eprintln!("This username has already been taken");
             
 
-            srp
+            return srp
         } else {
             srp = ServerReply {
                 prefix: ":".to_string() + &self.server_name.to_string(),
@@ -111,9 +172,9 @@ impl Server {
                     + &user.full_name,
             };
 
-            connection.write(srp.param_two.as_bytes()).unwrap();
+            // connection.write(srp.param_two.as_bytes()).unwrap();
             self.connected_users.push(user);
-            srp
+            return srp
         }
     }
 
@@ -130,9 +191,9 @@ impl Server {
             let client_reg_msg = stream.write(&buf[..bytes_read])?;
     
             let client_msg = String::from_utf8(buf.to_vec()).unwrap();
-            // println!("from the sender: {}", client_msg.unwrap());
+            println!("from the sender: {}", client_msg);
     
-            // thread::sleep(time::Duration::from_secs(1));
+            thread::sleep(time::Duration::from_secs(1));
         }
     
         Ok(())

@@ -1,10 +1,11 @@
 use std::cell::RefCell;
 use std::net::{TcpListener, TcpStream, SocketAddr, IpAddr, Ipv4Addr};
+use std::sync::Arc;
 use std::{io, time};
 use std::io::{prelude::*, BufReader};
 use std::thread;
 use uuid::Uuid;
-use rustirc::server::Server;
+use rustirc::server::{LeafServer, ServerName, HubServer, self};
 use rustirc::user::{User, IrcClient};
 use rustirc::channel::{Channel, ChannelCreator};
 use rustirc::client::Client;
@@ -86,10 +87,16 @@ struct RegisteredClient {
 #[derive(Clone)]
 struct Network {
     // Use petgraph to implement this.
-    servers: Vec<Server>,
+    servers: Vec<LeafServer>,
 }
 
 fn main() {
+
+    let server_hub = Arc::new(HubServer {
+        leaf_servers: None,
+        socket_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 7272),
+        nud: Uuid::new_v4()
+    });
 
     let proto_user = User {
         nickname: "ProtoUser".to_string(),
@@ -113,10 +120,10 @@ fn main() {
     let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),7878);
     let server_nud = Uuid::new_v4();
 
-    let mut proto_server: Server = Server {
+    let mut proto_server: LeafServer = LeafServer {
         channels: channel_vec,
         connected_users: user_vec,
-        server_name: String::from("ProtoServer"),
+        server_name: ServerName(String::from("ProtoServer")),
         socket_addr: socket,
         nud: server_nud
     };
@@ -127,8 +134,14 @@ fn main() {
     };
 
     
-    proto_server.clone().run();
-    proto_client.register_client(&proto_user, socket, false);
+    // proto_server.clone().run();
+
+    // server_hub.run();
+
+    let hub: Arc<HubServer> = Arc::clone(&server_hub);
+    hub.clone().run();
+    let hub_addr = hub.socket_addr;
+    proto_client.register_client(&proto_user, hub_addr, false);
 
     let conn_user = proto_server.handle_registration(proto_client, proto_user);
 
