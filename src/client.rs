@@ -2,11 +2,19 @@ use std::net::{TcpStream, SocketAddr};
 use crate::server::LeafServer;
 use crate::user::User;
 use std::io::{Read, Write};
-
+use bincode::{config, Encode, Decode};
 #[derive(Clone, Debug)]
 pub struct Client {
     pub server: LeafServer,
     pub user: User,
+}
+
+#[derive(Encode, Decode)]
+pub enum Commands {
+    Connect,
+    Join,
+    Part,
+    PrivMsg
 }
 
 impl Client {
@@ -29,7 +37,7 @@ impl Client {
         connection.write_all(nick_msg.as_bytes()).expect("Failed to write.");
 
         
-        // connection.write_all(user_msg.as_bytes()).expect("Failed to write.");
+        connection.write_all(user_msg.as_bytes()).expect("Failed to write.");
         
         let mut buffer = Vec::new();
 

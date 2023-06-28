@@ -8,6 +8,7 @@ use crate::client::Client;
 use std::{io, time};
 use std::io::{Read, Write, BufReader, BufRead};
 use std::thread;
+use std::sync::Arc;
 
 const ERR_NICKNAMEINUSE: &str = "433";
 
@@ -27,29 +28,30 @@ pub struct HubServer {
     pub nud: Uuid,
 }
 
-impl HubServer {
-    pub fn run(self) -> HubServer {
-        let listener: TcpListener = TcpListener::bind(self.socket_addr).unwrap();
+pub fn hub_run(hub_server: &HubServer) {
+    let listener: TcpListener = TcpListener::bind(hub_server.socket_addr).unwrap();
+    let hub_server = hub_server.clone();
+    thread::spawn(move || {
+        for stream in listener.incoming() {
 
-        thread::spawn(move || {
-            for stream in listener.incoming() {
-              match stream  {    
-                    Ok(stream) => {
-                        let stream = &self.clone().handle_sender(&stream);
-                        stream.as_ref().unwrap();
-                    }
-                    Err(e) => {
-                        eprintln!("There was a server error {:?}", e);
-                    }
+
+          match stream  {
+                Ok(stream) => {
+                    let stream = hub_server.handle_registration(stream).unwrap();
+                }
+                Err(e) => {
+                    eprintln!("There was a server error {:?}", e);
                 }
             }
-        });
 
-        self.clone()
+        }
+    });
 
-    }
 
-        pub fn handle_sender(&self, mut stream: &TcpStream) -> io::Result<()> {
+}
+impl HubServer {
+
+        pub fn handle_registration(&self, mut stream: TcpStream) -> io::Result<()> {
         let mut buf = [0;512];
     
         for _ in 0..1000 {
@@ -58,8 +60,6 @@ impl HubServer {
             if bytes_read == 0 {
                 return Ok(())
             }
-    
-            let client_reg_msg = stream.write(&buf[..bytes_read])?;
     
             let client_msg = String::from_utf8(buf.to_vec()).unwrap();
             println!("from the sender: {}", client_msg);

@@ -5,7 +5,7 @@ use std::{io, time};
 use std::io::{prelude::*, BufReader};
 use std::thread;
 use uuid::Uuid;
-use rustirc::server::{LeafServer, ServerName, HubServer, self};
+use rustirc::server::{LeafServer, ServerName, HubServer, hub_run};
 use rustirc::user::{User, IrcClient};
 use rustirc::channel::{Channel, ChannelCreator};
 use rustirc::client::Client;
@@ -72,13 +72,6 @@ pub enum Recipient {
     User,
 }
 
-pub enum Commands {
-    Connect,
-    Join,
-    Part,
-    PrivMsg
-}
-
 
 #[derive(Clone)]
 struct RegisteredClient {
@@ -92,11 +85,11 @@ struct Network {
 
 fn main() {
 
-    let server_hub = Arc::new(HubServer {
+    let server_hub = HubServer {
         leaf_servers: None,
         socket_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 7272),
         nud: Uuid::new_v4()
-    });
+    };
 
     let proto_user = User {
         nickname: "ProtoUser".to_string(),
@@ -138,9 +131,8 @@ fn main() {
 
     // server_hub.run();
 
-    let hub: Arc<HubServer> = Arc::clone(&server_hub);
-    hub.clone().run();
-    let hub_addr = hub.socket_addr;
+    let hub_server = hub_run(&server_hub);
+    let hub_addr = server_hub.socket_addr;
     proto_client.register_client(&proto_user, hub_addr, false);
 
     let conn_user = proto_server.handle_registration(proto_client, proto_user);
