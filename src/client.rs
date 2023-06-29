@@ -2,16 +2,19 @@ use std::net::{TcpStream, SocketAddr};
 use crate::server::LeafServer;
 use crate::user::User;
 use std::io::{Read, Write};
-use bincode::{config, Encode, Decode};
+use bincode::options;
 #[derive(Clone, Debug)]
 pub struct Client {
-    pub server: LeafServer,
+    pub server: Option<Vec<LeafServer>>,
     pub user: User,
 }
 
-#[derive(Encode, Decode)]
-pub enum Commands {
-    Connect,
+pub enum Command {
+    Connect {
+        user_nick: String,
+        user_full_name: String,
+
+    },
     Join,
     Part,
     PrivMsg
@@ -19,14 +22,14 @@ pub enum Commands {
 
 impl Client {
 
-    pub fn new(server: LeafServer, user: User) -> Self {
+    pub fn new(server: Option<Vec<LeafServer>>, user: User) -> Self {
         Client {
-            server,
+            server: None,
             user
         }
     }
 
-    pub fn register_client(&self, user: &User, socket: SocketAddr, pass: bool) {
+    pub fn register_client(&self, user: &User, socket: SocketAddr, pass: bool) -> Command {
 
         let mut connection = TcpStream::connect(socket).unwrap();
 
@@ -48,7 +51,14 @@ impl Client {
         
         println!("Server response: {:}", server_resp);
 
+        Command::Connect {
+            user_nick: nick_msg,
+            user_full_name: user_msg
+        }
         
     }
 
 }
+
+#[derive(Debug)]
+pub struct ClientMessage(pub String);

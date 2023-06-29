@@ -132,6 +132,12 @@ fn main() {
     // server_hub.run();
 
     let hub_server = hub_run(&server_hub);
+
+    // 1. Initiate hub server with a socket address 7272.
+
+    // 2. Initiate leaf server with socket address 7878, register with hub server, by communicating to 7272.
+
+    //
     let hub_addr = server_hub.socket_addr;
     proto_client.register_client(&proto_user, hub_addr, false);
 

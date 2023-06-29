@@ -4,7 +4,7 @@ use std::{fmt, collections::HashMap};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use crate::channel::Channel;
 use crate::user::User;
-use crate::client::Client;
+use crate::client::{Client, ClientMessage, Command};
 use std::{io, time};
 use std::io::{Read, Write, BufReader, BufRead};
 use std::thread;
@@ -30,28 +30,27 @@ pub struct HubServer {
 
 pub fn hub_run(hub_server: &HubServer) {
     let listener: TcpListener = TcpListener::bind(hub_server.socket_addr).unwrap();
-    let hub_server = hub_server.clone();
-    thread::spawn(move || {
-        for stream in listener.incoming() {
+    // let hub_server = hub_server.clone();
+    // thread::spawn(move || {
+    //     for stream in listener.incoming() {
 
 
-          match stream  {
-                Ok(stream) => {
-                    let stream = hub_server.handle_registration(stream).unwrap();
-                }
-                Err(e) => {
-                    eprintln!("There was a server error {:?}", e);
-                }
-            }
+    //       match stream  {
+    //             Ok(stream) => {
+    //                 let stream = handle_registration(stream).unwrap();
+    //             }
+    //             Err(e) => {
+    //                 eprintln!("There was a server error {:?}", e);
+    //             }
+    //         }
 
-        }
-    });
+    //     }
+    // });
 
 
 }
-impl HubServer {
 
-        pub fn handle_registration(&self, mut stream: TcpStream) -> io::Result<()> {
+        pub fn handle_registration(mut stream: TcpStream) -> io::Result<()> {
         let mut buf = [0;512];
     
         for _ in 0..1000 {
@@ -61,15 +60,59 @@ impl HubServer {
                 return Ok(())
             }
     
-            let client_msg = String::from_utf8(buf.to_vec()).unwrap();
-            println!("from the sender: {}", client_msg);
+            let client_msg = ClientMessage(String::from_utf8(buf.to_vec()).unwrap());
+            println!("from the sender: {:?}", client_msg);
     
             thread::sleep(time::Duration::from_secs(1));
         }
     
         Ok(())
     }
-}
+
+    fn parse_nick(user_nick: String) -> bool {
+
+        
+        let nick_conform = false;
+        let user_full_name_conform = false;
+
+        let conform_bool_vec = vec![nick_conform, user_full_name_conform];
+
+
+        let mut user_parse = user_nick.split_whitespace();  
+    
+        if Some(user_parse.next().unwrap()) == Some("NICK") {
+            true
+        } else if {
+            false 
+        }
+    }
+    fn conform_to_spec(command_msg: Command) -> bool {
+        match command_msg {
+            Command::Connect { user_nick, user_full_name } => {
+                let nick_conform = parse_nick(user_nick);
+
+                nick_conform
+            },
+
+            _ => {
+                println!("I can't parse this yet!");
+            }
+        }
+
+        unimplemented!()
+    }
+    fn parse_client_msg(command_msg: Command, client_app: &Client) -> ServerReply {
+
+        if !conform_to_spec(client_msg) {
+            return ServerReply // failure message
+        } else {
+            return ServerReply
+        }
+
+        unimplemented!()
+    }
+// impl HubServer {
+// }
 
 #[derive(Clone, Debug)]
 pub struct LeafServer {
